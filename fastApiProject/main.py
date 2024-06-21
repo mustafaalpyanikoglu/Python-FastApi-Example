@@ -1,7 +1,15 @@
-from fastapi import FastAPI, Query, Path, Body
 from enum import Enum
-from typing import Optional
-from pydantic import BaseModel
+from typing import Optional, List, Union, Literal
+from urllib.request import Request
+from uuid import UUID
+from datetime import datetime, time, timedelta
+
+from fastapi import FastAPI, Query, HTTPException, File, UploadFile, Form, Path, Body, Cookie, Header, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError, StarletteHTTPException
+from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
+from pydantic import BaseModel, Field, HttpUrl, EmailStr
+from starlette.responses import JSONResponse, PlainTextResponse
 
 app = FastAPI()
 
@@ -180,35 +188,516 @@ async def base_get_route():
 Part 7 -> Body - Multiple Parameters
 """
 
+# class Item(BaseModel):
+#     name: str
+#     description: str | None = None
+#     price: float
+#     tax: float | None = None
+#
+#
+# class User(BaseModel):
+#     username: str
+#     full_name: str | None = None
+#
+#
+# @app.put("/items/{item_id}")
+# async def update_item(
+#         *,
+#         item_id: int = Path(..., title = "Th ID of the item to get", ge = 0, le = 150),
+#         q: str | None = None,
+#         item: Item = Body(..., embed = True)
+#         # user: User,
+#         # importance: int = Body(...)
+# ):
+#     results = {"item_id": item_id}
+#     if q:
+#         results.update({"q": q})
+#     if item:
+#         results.update({"item": item})
+#     # if user:
+#     #     results.update({"user": user})
+#     # if importance:
+#     #     results.update({"importance": importance})
+#     return results
+
+
+"""
+Part 8 -> Body - Fields
+"""
+
+#
+# class Item(BaseModel):
+#     name: str
+#     description: str | None = Field(
+#         title = "The description of the item",
+#         max_length = 300
+#     )
+#     price: float = Field(..., gt = 0, description = "The price must be a greater than zero.")
+#     tax: float | None = None
+#
+#
+# @app.put("/items/{item_id}")
+# async def update_item(
+#         item_id: str,
+#         item: Item = Body(..., embed = True),
+# ):
+#     results = {"item_id": item_id, "item": item}
+#     return results
+
+
+"""
+Part 9 -> Body - Nested Models
+"""
+
+# class Image(BaseModel):
+#     url: HttpUrl
+#     name: str
+#
+#
+# class Item(BaseModel):
+#     name: str
+#     description: str | None = None
+#     price: float
+#     tax: float | None = None
+#     tags: set[str] = set()
+#     image: list[Image] | None = None
+#
+#
+# class Offer(BaseModel):
+#     name: str
+#     description: str | None = None
+#     price: float
+#     item: list[Item]
+#
+# @app.put("/items/{item_id}")
+# async def update_item(item_id: int, item: Item):
+#     results = {"item_id": item_id, "item": item}
+#     return results
+#
+# @app.post("/offers")
+# async def create_offer(offer: Offer = Body(..., embed = True)):
+#     return offer
+#
+# @app.post("/images/multiple")
+# async def create_multiple_images(images: list[Image]):
+#     return images
+#
+# @app.post("blah")
+# async def create_some_blahs(blahs: dict[int, float]):
+#     return blahs
+
+
+"""
+Part 10 -> Declare Request Example Data
+"""
+
+# class Item(BaseModel):
+#     name: str
+#     description: str | None = None
+#     price: float
+#     tax: float | None = None
+#
+#     # class Config:
+#     #     schema_extra = {
+#     #         "example": {
+#     #             "name": "Foo",
+#     #             "description": "A very nice Item",
+#     #             "price": 5.24,
+#     #             "tax": 0.99,
+#     #         }
+#     #     }
+#
+#
+# @app.put("/items/{item_id}")
+# async def update_item(
+#         item_id: int,
+#         item: Item = Body(
+#             ...,
+#             examples = {
+#                 "normal": {
+#                     "summary": "A normal example",
+#                     "description": "A __normal__item works _correctly_",
+#                     "value": {
+#                         "description": "A very nice Item",
+#                         "name": "Foo",
+#                         "price": 16.25,
+#                         "tax": 1.67,
+#                     },
+#                 },
+#                 "converted": {
+#                     "summary": "An example with converted data",
+#                     "description": "FastAPI can convert price 'strings' to actual 'numbers' automatically",
+#                     "value": {"name": "Bar", "price": "16.25"}
+#                 },
+#                 "invalid": {
+#                     "summary": "Invalid data is rejected with an error",
+#                     "description": "Hello world",
+#                     "value": {"name": "Bar", "price": "16.25"}
+#                 },
+#             })
+# ):
+#     results = {"item_id": item_id, "item": item}
+#     return results
+
+
+"""
+Part 11 -> Extra Data Types
+"""
+
+# @app.put("/items/{item_id}")
+# async def read_items(
+#     item_id: UUID,
+#     start_date: datetime | None = Body(None),
+#     end_date: datetime | None = Body(None),
+#     repeat_at: time | None = Body(None),
+#     process_after: timedelta | None = Body(None),
+# ):
+#     start_process = start_date + process_after
+#     duration = end_date - start_process
+#     return {
+#         "item_id": item_id,
+#         "start_date": start_date,
+#         "end_date": end_date,
+#         "repeat_at": repeat_at,
+#         "process_after": process_after,
+#         "duration": duration
+#     }
+
+
+"""
+Part 12 -> Cookie and Header Parameters
+"""
+
+# @app.get("/items")
+# async def read_items(
+#         cookie_id: str | None = Cookie(None),
+#         accept_encoding: str | None = Header(None),
+#         sec_ch_ua: str | None = Header(None),
+#         user_agent: str | None = Header(None),
+#         x_token: list[str] | None = Header(None),
+# ):
+#     return {
+#       "cookie_id": cookie_id,
+#       "accept_encoding": accept_encoding,
+#       "sec_ch_ua": sec_ch_ua,
+#       "user_agent": user_agent,
+#       "X-Token Values": x_token,
+#     }
+
+
+"""
+Part 13 -> Response Model
+"""
+
+# class Item(BaseModel):
+#   name: str
+#   description: Optional[str] = None
+#   price: float
+#   tax: Optional[float] = 10.5
+#   tags: list[str] = []
+#
+# items = {
+#   "foo": {"name": "Foo", "price": 50.2},
+#   "bar": {
+#     "name": "Bar",
+#     "description": "The bartenders",
+#     "price": 62,
+#     "tax": 20.2},
+#   "baz": {
+#     "name": "Baz",
+#     "description": None,
+#     "price": 50.2,
+#     "tax": 10.5,
+#     "tags": []}
+# }
+#
+# @app.get(
+#   "/items/{item_id}",
+#   response_model = Item,
+#   response_model_exclude_unset = True
+# )
+# async def read_item(item_id: Literal["foo", "bar", "baz"]):
+#   return items[item_id]
+#
+# @app.post(
+#   "/items",
+#   response_model = Item,
+# )
+# async def create_item(item: Item):
+#   return item
+#
+# @app.get(
+#   "/items/{item_id}/name",
+#   response_model = Item,
+#   response_model_include = {"name", "description"},
+#   response_model_exclude = {"tax"},
+# )
+# async def read_item_name(item_id: Literal['foo', 'bar', 'baz']):
+#   return items[item_id]
+#
+# @app.get(
+#   "/items/{item_id}/public",
+#   response_model = Item,
+#   response_model_exclude = {"tax"},
+# )
+# async def read_items_public_data(item_id: Literal['foo', 'bar', 'baz']):
+#   return items[item_id]
+#
+#
+# class UserBase(BaseModel):
+#   username: str
+#   email: EmailStr
+#   full_name: Optional[str] = None
+#
+# class UserIn(UserBase):
+#   password: str
+#
+# class UserOut(UserBase):
+#   pass
+#
+# @app.post("/users", response_model = UserOut)
+# async def create_user(user: UserIn):
+#   return user
+
+
+# class UserBase(BaseModel):
+#   username: str
+#   email: EmailStr
+#   full_name: Optional[str] = None
+#
+# class UserIn(UserBase):
+#   password: str
+#
+# class UserOut(UserBase):
+#   pass
+#
+# class UserInDB(UserBase):
+#   hashed_password: str
+#
+#
+# def fake_password_hash(raw_password: str):
+#   return f"supersecret{raw_password}"
+#
+# def fake_save_user(user_in: UserIn):
+#   hashed_password = fake_password_hash(user_in.password)
+#   user_in_db = UserInDB(**user_in.dict(), hashed_password = hashed_password)
+#   print("userin.dict", user_in.dict)
+#   print("User 'saved'.")
+#   return user_in_db
+#
+# @app.post("/user/", response_model = UserOut)
+# async def create_user(user_in: UserIn):
+#   user_saved = fake_save_user(user_in)
+#   return user_saved
+#
+#
+# class BaseItem(BaseModel):
+#     description: str
+#     type: str
+#
+# class CarItem(BaseItem):
+#   type: Literal["car"] = "car"
+#
+# class PlaneItem(BaseItem):
+#   type: Literal["plane"] = "plane"
+#   size: int
+# items = {
+#   "item1": {"description": "All my friend drive a low rider", "type": "car"},
+#   "item2": {"description": "Music is my areoplane", "type": "plane", "size": 5},
+# }
+#
+# @app.get(
+#   "/items/{item_id}",
+#   response_model = Union[PlaneItem, CarItem]
+# )
+# async def read_item(item_id: Literal["item1", "item2"]):
+#   return items[item_id]
+#
+# class ListItem(BaseModel):
+#   name: str
+#   description: str
+#
+# list_items = [
+#   {"name": "Foo", "description": "Foo", "type": "car"},
+#   {"name": "Bar", "description": "Bar", "type": "plane"},
+# ]
+#
+# @app.get("/list_items/", response_model = list[ListItem])
+# async def read_items():
+#   return list_items
+#
+# @app.get("/arbitrary/", response_model = dict[str, float])
+# async def get_arbitrary():
+#   return {"foo": 1, "bar": "2"}
+
+# @app.post("/items/", status_code = status.HTTP_201_CREATED)
+# async def create_item(name: str):
+#   return {"name": name}
+
+
+
+#Part 16 -> Form Fields
+
+
+# class User(BaseModel):
+#   username: str
+#   password: str
+#
+#
+# @app.post("/login/")
+# async def login(
+#         username: str = Form(...),
+#         password: str = Form(...),
+# ):
+#   print("password", password)
+#   return {"username": username}
+#
+#
+# class User(BaseModel):
+#   username: str
+#   password: str
+#
+#
+# @app.post("/login-json/")
+# async def login_json(
+#         username: str = Body(...),
+#         password: str = Body(...)
+# ):
+#   return {"username": username}
+
+# Part 17 -> Request Files
+
+
+# @app.post("/files/")
+# async def create_file(
+#         files: list[bytes] | None = File(
+#           None,
+#           description = "A file read as bytes"
+#         )
+# ):
+#   if not files:
+#     return {"message": "No file send"}
+#   return {"file": [len(files)]}
+#
+#
+# @app.post("/upload-file/")
+# async def upload_file(
+#         files: list[UploadFile] = File(
+#           ...,
+#           description = "A file read as bytes"
+#         )
+# ):
+#   if not files:
+#     return {"message": "No upload file sent"}
+#   print("file:", files)
+#   contents = await files[0].read()
+#   return {"filename": [file.filename for file in files]}
+
+
+# @app.post("/files/")
+# async def create_file(
+#         file: bytes = File(...),
+#         fileb: UploadFile = File(...),
+#         token: str = Form(...)
+# ):
+#   return {
+#     "file_size": len(file),
+#     "token": token,
+#     "fileb_content_type": fileb.content_type
+#   }
+
+
+# Part 19 - Handling Errors
+items = {"foo": "The Foo Wrestlers"}
+
+@app.get("/items/{item_id}")
+async def read_item(item_id: Literal['foo', 'bar', 'baz']):
+  if item_id not in items:
+    raise HTTPException(
+      status_code = status.HTTP_404_NOT_FOUND,
+      detail = "Item not found",
+      headers = {"X-Error": "There goes my error"})
+  return {"item": items[item_id]}
+
+
+class UnicornException(Exception):
+  def __init__(self, name: str):
+    self.name = name
+
+
+@app.exception_handler(UnicornException)
+async def unicorn_exception_handler(request: Request, exc: UnicornException):
+  return JSONResponse(
+    status_code = status.HTTP_418_IM_A_TEAPOT,
+    content = {"message": f"Opps! {exc.name} did something. There goes a rainbow..."},
+  )
+
+
+@app.get("/unicorns/{name}")
+async def read_unicorns(name: str):
+  if name == "yolo":
+    raise UnicornException(name = name)
+  return {"unicorn_name": name}
+
+
+# @app.exception_handler(RequestValidationError)
+# async def validation_exception_handler(request, exc):
+#   print("request", request)
+#   print("exc", exc)
+#   return PlainTextResponse(
+#     str(exc),
+#     status_code = status.HTTP_400_BAD_REQUEST
+#   )
+#
+# @app.exception_handler(StarletteHTTPException)
+# async def http_exception_handler(request, exc: StarletteHTTPException):
+#   return PlainTextResponse(
+#     str(exc.detail),
+#     status_code = exc.status_code
+#   )
+#
+# @app.get("/validation_items/{items_id}")
+# async def read_validation_items(item_id: int):
+#   if item_id == 3:
+#     raise HTTPException(status_code = status.HTTP_418_IM_A_TEAPOT, detail = "Nope! I don't like 3.")
+#   return {"item_id": item_id}
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+  print("request", request)
+  print("exc", exc)
+  return JSONResponse(
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY,
+    content = jsonable_encoder({
+      "detail": exc.errors(),
+      "body": exc.body,
+    }),
+  )
+
+@app.exception_handler(StarletteHTTPException)
+async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
+  # loglama yapılabilir
+  print(f"OMG! An Http Error: {repr(exc)}")
+  return await http_exception_handler(request, exc=exc)
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+  # loglama yapılabilir
+  print(f"OMG! The client sent invalid data!: {repr(exc)}")
+  return await request_validation_exception_handler(request, exc=exc)
 
 class Item(BaseModel):
-    name: str
-    description: str | None = None
-    price: float
-    tax: float | None = None
+  title: str
+  size: int
 
+@app.post("/items/")
+async def create_item(item: Item):
 
-class User(BaseModel):
-    username: str
-    full_name: str | None = None
+  return item
 
-
-@app.put("/items/{item_id}")
-async def update_item(
-        *,
-        item_id: int = Path(..., title = "Th ID of the item to get", ge = 0, le = 150),
-        q: str | None = None,
-        item: Item = Body(..., embed = True)
-        # user: User,
-        # importance: int = Body(...)
-):
-    results = {"item_id": item_id}
-    if q:
-        results.update({"q": q})
-    if item:
-        results.update({"item": item})
-    # if user:
-    #     results.update({"user": user})
-    # if importance:
-    #     results.update({"importance": importance})
-    return results
+@app.get("/blah_items/{item_id}")
+async def read_item(item_id: int):
+  if item_id == 3:
+    raise HTTPException(status_code = status.HTTP_418_IM_A_TEAPOT, detail = "Nope! I don't like 3.")
+  return {"item_id": item_id}
