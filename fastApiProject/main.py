@@ -4,7 +4,12 @@ from urllib.request import Request
 from uuid import UUID
 from datetime import datetime, time, timedelta
 
-from fastapi import FastAPI, Query, HTTPException, File, UploadFile, Form, Path, Body, Cookie, Header, status
+from fastapi import (
+  FastAPI, Query, HTTPException,
+  File, UploadFile, Form,
+  Path, Body, Cookie,
+  Header, status, Depends
+)
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError, StarletteHTTPException
 from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
@@ -14,18 +19,212 @@ from starlette.responses import JSONResponse, PlainTextResponse
 app = FastAPI()
 
 
-fake_items_db = [{"item_id": "1", "food_name": "Apple"}, {"item_id": "2", "food_name": "Banana"},
-                 {"item_id": "3", "food_name": "Cherry"}, {"item_id": "4", "food_name": "Date"},
-                 {"item_id": "5", "food_name": "Elderberry"}, {"item_id": "6", "food_name": "Fig"},
-                 {"item_id": "7", "food_name": "Grape"}, {"item_id": "8", "food_name": "Honeydew"},
-                 {"item_id": "9", "food_name": "Kiwi"}, {"item_id": "10", "food_name": "Lemon"}]
-
+# fake_items_db = [{"item_id": "1", "food_name": "Apple"}, {"item_id": "2", "food_name": "Banana"},
+#                  {"item_id": "3", "food_name": "Cherry"}, {"item_id": "4", "food_name": "Date"},
+#                  {"item_id": "5", "food_name": "Elderberry"}, {"item_id": "6", "food_name": "Fig"},
+#                  {"item_id": "7", "food_name": "Grape"}, {"item_id": "8", "food_name": "Honeydew"},
+#                  {"item_id": "9", "food_name": "Kiwi"}, {"item_id": "10", "food_name": "Lemon"}]
+#
 
 # GET /
 @app.get("/", description="This is our first route.")
 async def base_get_route():
     return {"message": "Hello World"}
 
+
+#Part 22 - Dependencies
+
+# async def hello():
+#   return "world"
+#
+# async def common_parameters(
+#         q: str | None = None,
+#         skip: int = 0,
+#         limit: int = 100,
+#         blah: str = Depends(hello)
+# ):
+#   return {"q": q, "skip": skip, "limit": limit, "hello": blah}
+
+
+# @app.get("/items", tags = ["items"])
+# async def read_items(commons: dict = Depends(common_parameters)):
+#   return commons
+#
+#
+# @app.get("/users", tags = ["items"])
+# async def read_users(commons: dict = Depends(common_parameters)):
+#   return commons
+
+
+# fake_items_db = [
+#   {"item_name": "Foo"},
+#   {"item_name": "Bar"},
+#   {"item_name": "Baz"},
+# ]
+#
+# class CommonQueryParams:
+#   def __init__(self, q:str | None = None, skip: int = 0, limit: int = 100):
+#     self.q = q
+#     self.skip = skip
+#     self.limit = limit
+#
+# @app.get("/items")
+# async def read_items(commons: CommonQueryParams = Depends()):
+#   response = {}
+#   if commons.q:
+#     response.update({"q": commons.q})
+#   items = fake_items_db[commons.skip: commons.skip + commons.limit]
+#   response.update({"items": items})
+#   return response
+
+# def query_extractor(q: str | None = None):
+#   return q
+#
+# def query_or_body_extractor(
+#         q: str = Depends(query_extractor),
+#         last_query: str | None = Body(None)
+# ):
+#   if q:
+#     return q
+#   return last_query
+#
+# @app.post("/item")
+# async def try_query(query_or_body: str = Depends(query_or_body_extractor)):
+#   return {"q_or_body": query_or_body}
+
+async def verify_token(x_token: str = Header(...)):
+  if x_token != "fake-super-secret-token":
+    raise HTTPException(
+      status_code = status.HTTP_400_BAD_REQUEST,
+      detail = "X-Token header invalid."
+    )
+
+async def verify_key(x_key: str = Header(...)):
+  if x_key != "fake-super-secret-token":
+    raise HTTPException(
+      status_code = status.HTTP_400_BAD_REQUEST,
+      detail = "X-Key header invalid."
+    )
+  return x_key
+
+app = FastAPI(dependencies = [Depends(verify_token), Depends(verify_key)])
+
+
+@app.get("/items", dependencies = [Depends(verify_token), Depends(verify_key)])
+async def read_items():
+  return [{"item": "foo"}, {"item": "bar"}]
+
+
+@app.get("/users", dependencies = [Depends(verify_token), Depends(verify_key)])
+async def read_users():
+  return [{"username": "Mustafa"}, {"username": "Alp"}]
+
+
+
+
+#Part 22 - End
+
+
+
+#Part 21 - JSON Compatible Encoder
+#
+# class Item(BaseModel):
+#   name: str | None = None
+#   description: str | None = None
+#   price: float | None = None
+#   tax: float = 10.5
+#   tags: list[str] = []
+#
+# items = {
+#   "foo": {"name": "Foo", "price": 50.2},
+#   "bar": {"name": "Bar", "description": "The bartenders", "price": 62, "tax": 20.2},
+#   "baz": {
+#     "name": "Baz",
+#     "description": "50.2",
+#     "price": 50.2,
+#     "tax": 33,
+#     "tags": []
+#   }
+# }
+#
+# @app.get("/items/{item_id}", response_model = Item)
+# async def read_item(item_id: str):
+#   return items.get(item_id)
+#
+# @app.put("/items/{item_id}", response_model = Item)
+# def update_item(item_id: str, item: Item):
+#   update_item_encoded = jsonable_encoder(item)
+#   items[item_id] = update_item_encoded
+#   return update_item_encoded
+#
+# @app.patch("/items/{item_id}", response_model = Item)
+# async def read_item(item_id: str, item: Item):
+#   stored_item_data = items.get(item_id)
+#   if stored_item_data is not None:
+#     stored_item_model = Item(**stored_item_data)
+#   else:
+#     stored_item_model = Item()
+#   update_data = item.dict(exclude_unset = True)
+#   updated_item = stored_item_model.copy(update=update_data)
+#   items[item_id] = jsonable_encoder(updated_item)
+#   print(items[item_id])
+#   return updated_item
+
+
+#Part 21 - End
+
+#Part 20 - Path Operation Configuration
+#
+# class Item(BaseModel):
+#   name: str
+#   description: str | None = None
+#   price: float
+#   tax: float | None = None
+#   tags: set[str] | None = None
+#
+# class Tags(Enum):
+#   items = "items"
+#   users = "users"
+#
+# @app.post(
+#   "/items/",
+#   response_model = Item,
+#   status_code = status.HTTP_201_CREATED,
+#   tags = [Tags.items],
+#   # summary = "Create an Item",
+#   # description = "Create an item with all the information: name; description; tax; and a set of unique tags"
+#   response_description = "The created item",
+# )
+# async def create_item(item: Item):
+#   """
+#   Create an item with all the information
+#   - **name**: each item must have a name
+#   - **description**: a long description
+#   - **tax**: if the item doesn't have tax, you can omit this
+#   - **tags** a set of unique tag strings for this item
+#   """
+#   return item
+#
+#
+# @app.get("/items/", tags = [Tags.items, Tags.users])
+# async def read_items():
+#   return [{"name": "Foo", "price": 43}]
+#
+#
+# @app.get("/users/", tags = [Tags.users])
+# async def read_users():
+#   return [{"username": "Alp"}]
+#
+#
+# @app.get("/elements/", tags = [Tags.items], deprecated = True)
+# async def read_element():
+#   return [{"item_id": "Foo"}]
+
+#Part 20 - End
+
+"""
+Start
+"""
 
 # GET /hello/Connectinno
 # @app.get("/hello/{name}")
@@ -608,36 +807,36 @@ Part 13 -> Response Model
 
 
 # Part 19 - Handling Errors
-items = {"foo": "The Foo Wrestlers"}
-
-@app.get("/items/{item_id}")
-async def read_item(item_id: Literal['foo', 'bar', 'baz']):
-  if item_id not in items:
-    raise HTTPException(
-      status_code = status.HTTP_404_NOT_FOUND,
-      detail = "Item not found",
-      headers = {"X-Error": "There goes my error"})
-  return {"item": items[item_id]}
-
-
-class UnicornException(Exception):
-  def __init__(self, name: str):
-    self.name = name
-
-
-@app.exception_handler(UnicornException)
-async def unicorn_exception_handler(request: Request, exc: UnicornException):
-  return JSONResponse(
-    status_code = status.HTTP_418_IM_A_TEAPOT,
-    content = {"message": f"Opps! {exc.name} did something. There goes a rainbow..."},
-  )
-
-
-@app.get("/unicorns/{name}")
-async def read_unicorns(name: str):
-  if name == "yolo":
-    raise UnicornException(name = name)
-  return {"unicorn_name": name}
+# items = {"foo": "The Foo Wrestlers"}
+#
+# @app.get("/items/{item_id}")
+# async def read_item(item_id: Literal['foo', 'bar', 'baz']):
+#   if item_id not in items:
+#     raise HTTPException(
+#       status_code = status.HTTP_404_NOT_FOUND,
+#       detail = "Item not found",
+#       headers = {"X-Error": "There goes my error"})
+#   return {"item": items[item_id]}
+#
+#
+# class UnicornException(Exception):
+#   def __init__(self, name: str):
+#     self.name = name
+#
+#
+# @app.exception_handler(UnicornException)
+# async def unicorn_exception_handler(request: Request, exc: UnicornException):
+#   return JSONResponse(
+#     status_code = status.HTTP_418_IM_A_TEAPOT,
+#     content = {"message": f"Opps! {exc.name} did something. There goes a rainbow..."},
+#   )
+#
+#
+# @app.get("/unicorns/{name}")
+# async def read_unicorns(name: str):
+#   if name == "yolo":
+#     raise UnicornException(name = name)
+#   return {"unicorn_name": name}
 
 
 # @app.exception_handler(RequestValidationError)
@@ -662,42 +861,42 @@ async def read_unicorns(name: str):
 #     raise HTTPException(status_code = status.HTTP_418_IM_A_TEAPOT, detail = "Nope! I don't like 3.")
 #   return {"item_id": item_id}
 
-
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-  print("request", request)
-  print("exc", exc)
-  return JSONResponse(
-    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY,
-    content = jsonable_encoder({
-      "detail": exc.errors(),
-      "body": exc.body,
-    }),
-  )
-
-@app.exception_handler(StarletteHTTPException)
-async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
-  # loglama yapılabilir
-  print(f"OMG! An Http Error: {repr(exc)}")
-  return await http_exception_handler(request, exc=exc)
-
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-  # loglama yapılabilir
-  print(f"OMG! The client sent invalid data!: {repr(exc)}")
-  return await request_validation_exception_handler(request, exc=exc)
-
-class Item(BaseModel):
-  title: str
-  size: int
-
-@app.post("/items/")
-async def create_item(item: Item):
-
-  return item
-
-@app.get("/blah_items/{item_id}")
-async def read_item(item_id: int):
-  if item_id == 3:
-    raise HTTPException(status_code = status.HTTP_418_IM_A_TEAPOT, detail = "Nope! I don't like 3.")
-  return {"item_id": item_id}
+######
+# @app.exception_handler(RequestValidationError)
+# async def validation_exception_handler(request: Request, exc: RequestValidationError):
+#   print("request", request)
+#   print("exc", exc)
+#   return JSONResponse(
+#     status_code = status.HTTP_422_UNPROCESSABLE_ENTITY,
+#     content = jsonable_encoder({
+#       "detail": exc.errors(),
+#       "body": exc.body,
+#     }),
+#   )
+#
+# @app.exception_handler(StarletteHTTPException)
+# async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
+#   # loglama yapılabilir
+#   print(f"OMG! An Http Error: {repr(exc)}")
+#   return await http_exception_handler(request, exc=exc)
+#
+# @app.exception_handler(RequestValidationError)
+# async def validation_exception_handler(request: Request, exc: RequestValidationError):
+#   # loglama yapılabilir
+#   print(f"OMG! The client sent invalid data!: {repr(exc)}")
+#   return await request_validation_exception_handler(request, exc=exc)
+#
+# class Item(BaseModel):
+#   title: str
+#   size: int
+#
+# @app.post("/items/")
+# async def create_item(item: Item):
+#
+#   return item
+#
+# @app.get("/blah_items/{item_id}")
+# async def read_item(item_id: int):
+#   if item_id == 3:
+#     raise HTTPException(status_code = status.HTTP_418_IM_A_TEAPOT, detail = "Nope! I don't like 3.")
+#   return {"item_id": item_id}
