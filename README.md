@@ -1,5 +1,7 @@
 # FastAPI
 
+<img src="https://www.simplilearn.com/ice9/free_resources_article_thumb/FastAPI_b.jpg" width="1000" height="553" alt="">
+
 ## 1.1. FastAPI Nedir?
 
 - FastAPI, web uygulamaları ve API'ler geliştirmek için kullanılan Python’a ait bir web framework'üdür.
